@@ -1,1 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CVP Chart</title>
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
 
+  <body class="bg-slate-50">
+    <div id="root"></div>
+
+    <!-- React + ReactDOM (UMD) -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Recharts (UMD) -->
+    <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+
+    <!-- Babel (让浏览器能直接跑 JSX) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+      const { useMemo } = React;
+      const {
+        LineChart,
+        Line,
+        XAxis,
+        YAxis,
+        CartesianGrid,
+        Tooltip,
+        Legend,
+        ResponsiveContainer,
+        ReferenceLine,
+        AreaChart,
+        Area,
+        LabelList
+      } = Recharts;
+
+      const MetricCard = ({ title, value, subtitle, highlight = false, negative = false, alert = false }) => (
+        <div
+          className={
+            `p-5 rounded-xl border shadow-sm ` +
+            (highlight
+              ? "bg-slate-900 text-white border-slate-900"
+              : alert
+                ? "bg-red-50 border-red-200 text-slate-900"
+                : "bg-white border-slate-100 text-slate-900")
+          }
+        >
+          <p className={`text-xs font-medium uppercase tracking-wider ${highlight ? "text-slate-400" : "text-slate-500"}`}>
+            {title}
+          </p>
+          <p className={`text-2xl font-bold my-1 ${negative ? "text-red-600" : ""}`}>{value}</p>
+          <p className={`text-xs ${highlight ? "text-slate-400" : "text-slate-500"}`}>{subtitle}</p>
+        </div>
+      );
+
+      const App = () => {
+        const config = {
+          price: 74,
+          variableCost: 37,
+          fixedCost: 892000,
+          currentUnits: 24000
+        };
+
+        const unitCM = config.price - config.variableCost;
+        const breakEvenUnits = Math.ceil(config.fixedCost / unitCM);
+        const currentRevenue = config.currentUnits * config.price;
+        const currentTotalCost = config.fixedCost + config.currentUnits * config.variableCost;
+        const currentProfit = currentRevenue - currentTotalCost;
+        const marginOfSafety = config.currentUnits - breakEvenUnits;
+        const marginOfSafetyRate = ((marginOfSafety / config.currentUnits) * 100).toFixed(2);
+
+        const chartData = useMemo(() => {
+          const data = [];
+          for (let i = 20000; i <= 28000; i += 500) {
+            const revenue = i * config.price;
+            const totalCost = config.fixedCost + i * config.variableCost;
+            data.push({
+              units: i,
+              revenue,
+              totalCost,
+              fixedCost: config.fixedCost,
+              profit: revenue - totalCost
+            });
+          }
+          return data;
+        }, []);
+
+        const formatCurrency = (value) => `$${(value / 1000).toLocaleString()}k`;
+
+        return (
+          <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
+            <div className="max-w-6xl mx-auto">
+              <header className="mb-8 border-b border-slate-200 pb-4">
+                <h1 className="text-3xl font-bold text-slate-900">Financial Analysis: CVP Model</h1>
+                <p className="text-slate-500 mt-2">Break-even & Operating Risk Assessment at 24,000 Units</p>
+              </header>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <MetricCard title="Unit Contribution Margin" value={`$${unitCM}`} subtitle="Price $74 - Var $37" />
+                <MetricCard
+                  title="Break-Even Point (BEP)"
+                  value={`${breakEvenUnits.toLocaleString()} Units`}
+                  subtitle={`Sales req: ${formatCurrency(breakEvenUnits * config.price)}`}
+                  highlight
+                />
+                <MetricCard
+                  title="Current Profit"
+                  value={`$${currentProfit.toLocaleString()}`}
+                  subtitle="Operating at a loss"
+                  negative={currentProfit < 0}
+                />
+                <MetricCard
+                  title="Margin of Safety Rate"
+                  value={`${marginOfSafetyRate}%`}
+                  subtitle="Extremely thin buffer"
+                  alert={parseFloat(marginOfSafetyRate) < 5}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-center">
+                  <h2 className="text-xl font-semibold mb-6">Cost-Volume-Profit (CVP) Chart</h2>
+
+                  <div className="h-[450px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData} margin={{ top: 20, right: 30, left: 60, bottom: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+
+                        <XAxis
+                          dataKey="units"
+                          label={{ value: "Sales Volume (Units)", position: "insideBottomRight", offset: -10 }}
+                          stroke="#64748b"
+                        />
+
+                        <YAxis
+                          tickFormatter={formatCurrency}
+                          label={{
+                            value: "Amount ($)",
+                            angle: -90,
+                            position: "insideLeft",
+                            offset: -45,
+                            style: { textAnchor: "middle", fill: "#64748b", fontWeight: 500 }
+                          }}
+                          stroke="#64748b"
+                        />
+
+                        <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, ""]} />
+                        <Legend verticalAlign="top" align="right" height={36} />
+
+                        <Line type="monotone" dataKey="fixedCost" stroke="#94a3b8" strokeDasharray="5 5" dot={false} name="Fixed Cost" />
+                        <Line type="monotone" dataKey="totalCost" stroke="#ef4444" strokeWidth={2} dot={false} name="Total Cost" />
+                        <Line type="monotone" dataKey="revenue" stroke="#22c55e" strokeWidth={2} dot={false} name="Total Revenue" />
+
+                        <ReferenceLine x={breakEvenUnits} stroke="#334155" strokeDasharray="3 3">
+                          <LabelList value="BEP" position="top" />
+                        </ReferenceLine>
+
+                        <ReferenceLine x={config.currentUnits} stroke="#3b82f6" strokeWidth={2}>
+                          <LabelList value="Current Volume" position="top" />
+                        </ReferenceLine>
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <p className="text-xs text-slate-400 mt-4 text-center">
+                    Blue line indicates current operating level. Intersection represents the Break-Even point.
+                  </p>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <h2 className="text-lg font-semibold mb-4">Profit-Volume Profile</h2>
+                    <div className="h-[240px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 45, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="units" hide />
+                          <YAxis
+                            tickFormatter={(v) => `$${v / 1000}k`}
+                            label={{
+                              value: "Profit ($)",
+                              angle: -90,
+                              position: "insideLeft",
+                              offset: -35,
+                              style: { textAnchor: "middle", fill: "#64748b", fontSize: "12px" }
+                            }}
+                          />
+                          <Tooltip formatter={(v) => `$${Number(v).toLocaleString()}`} />
+                          <ReferenceLine y={0} stroke="#000" />
+                          <Area type="monotone" dataKey="profit" stroke="#3b82f6" fill="#dbeafe" name="Net Profit" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <p className="text-sm font-medium text-blue-600 mt-2 text-center bg-blue-50 py-1 rounded">
+                      Profit Zone vs. Loss Zone
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <span className="w-2 h-6 bg-blue-500 rounded-full"></span>
+                      Strategic Insights
+                    </h2>
+
+                    <div className="space-y-4">
+                      <div className="p-3 bg-red-50 border-l-4 border-red-400 rounded">
+                        <h3 className="font-bold text-red-800 text-sm uppercase italic">High Risk Warning</h3>
+                        <p className="text-sm text-red-700 mt-1">
+                          Current volume (24,000) is below BEP ({breakEvenUnits.toLocaleString()}). The business is currently burning cash.
+                        </p>
+                      </div>
+
+                      <div className="p-3 bg-amber-50 border-l-4 border-amber-400 rounded">
+                        <h3 className="font-bold text-amber-800 text-sm">Sensitivity Analysis</h3>
+                        <p className="text-sm text-amber-700 mt-1">
+                          Margin of Safety is {marginOfSafetyRate}%. A slight decline in demand will lead to deeper losses.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
